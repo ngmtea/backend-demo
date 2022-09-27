@@ -32,7 +32,7 @@ create_book_json_schema = {
     'properties': {
         'username': {'type': 'string'},
         'password': {'type': 'string'},
-        'roles': {'type': 'array', 'items': {'role' : {'type': 'string'}}},
+        'roles': {'type': 'array', 'items': {'role': {'type': 'string'}}},
         'publisher': {'type': 'string'},
         'description': {'type': 'string'},
     },

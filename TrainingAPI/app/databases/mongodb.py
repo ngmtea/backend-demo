@@ -54,6 +54,10 @@ class MongoDB:
             logger.exception(ex)
         return None
 
+    def put_book(self, _filter1, _filter2):
+        if not _filter1:
+            return None
+
     def get_users(self, filter_=None, projection=None):
         try:
             if not filter_:

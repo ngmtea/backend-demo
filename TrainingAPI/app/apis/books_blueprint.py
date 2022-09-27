@@ -9,7 +9,7 @@ from app.databases.redis_cached import get_cache, set_cache
 from app.decorators.json_validator import validate_with_jsonschema
 from app.hooks.error import ApiInternalError
 from app.models.book import create_book_json_schema, Book
-from app.models.user import User
+#from app.models.user import User
 
 books_bp = Blueprint('books_blueprint', url_prefix='/books')
 users_bp = Blueprint('users_blueprint', url_prefix='/users')
@@ -75,6 +75,19 @@ async def delete_book(request, username=None):
 
 @books_bp.route('/<book_id>/', methods={'GET'})
 async def get_book(request, book_id):
+    _filter = {"_id": book_id}
+    print(_filter)
+    book_objs = _db.get_books(_filter)
+    books = []
+    for book in book_objs:
+        books = book.to_dict()
+    #books = book_objs.to_dict()
+    return json({
+        'thisbook': books
+    })
+
+@books_bp.route('/<book_id>/', methods={'PUT'})
+async def put_book(request, book_id):
     _filter = {"_id": book_id}
     print(_filter)
     book_objs = _db.get_books(_filter)
