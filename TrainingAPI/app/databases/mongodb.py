@@ -2,6 +2,7 @@ from pymongo import MongoClient
 
 from app.constants.mongodb_constants import MongoCollections
 from app.models.book import Book
+from app.models.user import User
 from app.utils.logger_utils import get_logger
 from config import MongoDBConfig
 
@@ -54,9 +55,15 @@ class MongoDB:
             logger.exception(ex)
         return None
 
-    def put_book(self, _filter1, _filter2):
-        if not _filter1:
+    def put_book(self, _filter, data):
+        if not _filter:
             return None
+        try:
+            change_data = self._books_col.find_one_and_update(_filter, {"$set": data})
+            return change_data
+        except Exception as ex:
+            logger.exception(ex)
+        return None
 
     def get_users(self, filter_=None, projection=None):
         try:
@@ -65,8 +72,40 @@ class MongoDB:
             cursor = self._users_col.find(filter_, projection=projection)
             data = []
             for doc in cursor:
-                data.append(Book().from_dict(doc))
+                data.append(User().from_dict(doc))
             return data
         except Exception as ex:
             logger.exception(ex)
         return []
+
+    def add_user(self, user: User):
+        try:
+            inserted_user_doc = self._users_col.insert_one(user.to_dict())
+            return inserted_user_doc
+        except Exception as ex:
+            logger.exception(ex)
+        return None
+
+    def get_user(self, filter_=None, projection=None):
+        try:
+            if not filter_:
+                filter_ = {}
+            cursor = self._users_col.find(filter_, projection=projection)
+            data = []
+            for doc in cursor:
+                data.append(User().from_dict(doc))
+            return data[0]
+        except Exception as ex:
+            logger.exception(ex)
+        return None
+
+    def update_user_jwt(self, _filter, data):
+        if not _filter:
+            return None
+        try:
+            change_user_data = self._users_col.find_one_and_update(_filter, {"$set": data})
+            return change_user_data
+        except Exception as ex:
+            logger.exception(ex)
+        return None
+

@@ -2,17 +2,15 @@ import uuid
 
 from sanic import Blueprint
 from sanic.response import json
-
+from app.decorators.auth import protected
 from app.constants.cache_constants import CacheConstants
 from app.databases.mongodb import MongoDB
 from app.databases.redis_cached import get_cache, set_cache
 from app.decorators.json_validator import validate_with_jsonschema
-from app.hooks.error import ApiInternalError
+from app.hooks.error import ApiInternalError, ApiBadRequest
 from app.models.book import create_book_json_schema, Book
-#from app.models.user import User
 
 books_bp = Blueprint('books_blueprint', url_prefix='/books')
-users_bp = Blueprint('users_blueprint', url_prefix='/users')
 
 _db = MongoDB()
 
@@ -36,9 +34,9 @@ async def get_all_books(request):
 
 
 @books_bp.route('/', methods={'POST'})
-# @protected  # TODO: Authenticate
+@protected  # TODO: Authenticate
 @validate_with_jsonschema(create_book_json_schema)  # To validate request body
-async def create_book(request, username=None):
+async def create_book(request, username):
     body = request.json
 
     book_id = str(uuid.uuid4())
@@ -57,18 +55,26 @@ async def create_book(request, username=None):
 
 # TODO: write api get, update, delete book
 
-@books_bp.route('/', methods={'DELETE'})
-# @protected  # TODO: Authenticate
+@books_bp.route('/<book_id>', methods={'DELETE'})
+@protected  # TODO: Authenticate
 #@validate_with_jsonschema(create_book_json_schema)  # To validate request body
-async def delete_book(request, username=None):
-    filter_find = request.json
+async def delete_book(request, book_id, username):
 
-    # # TODO: Save book to database
-    deleted = _db.delete_book(filter_find)
+    filter_ = {"_id": book_id}
+
+    book_objs = _db.get_books(filter_)
+    if (len(book_objs)==0):
+        return json({
+            "status": "Cannot find this book"
+        })
+    book = book_objs[0].to_dict()
+
+    if book['owner'] != username:
+        raise ApiBadRequest("You cannot have changes to this book")
+
+    deleted = _db.delete_book(filter_)
     if not deleted:
         raise ApiInternalError('Fail to delete book')
-
-    # TODO: Update cache
 
     return json({'status': 'deleted successfully'})
 
@@ -78,36 +84,39 @@ async def get_book(request, book_id):
     _filter = {"_id": book_id}
     print(_filter)
     book_objs = _db.get_books(_filter)
-    books = []
-    for book in book_objs:
-        books = book.to_dict()
+    if (len(book_objs)==0):
+        return json({
+            "status": "Cannot find this book"
+        })
+    book = book_objs[0].to_dict()
+    #for book in book_objs:
+    #    books = book.to_dict()
     #books = book_objs.to_dict()
     return json({
-        'thisbook': books
+        'thisbook': book
     })
 
 @books_bp.route('/<book_id>/', methods={'PUT'})
-async def put_book(request, book_id):
+@protected
+async def put_book(request, book_id, username):
+    changed_data = request.json
     _filter = {"_id": book_id}
     print(_filter)
     book_objs = _db.get_books(_filter)
-    books = [book.to_dict() for book in book_objs]
-    return json({
-        'books': books
-    })
+    if (len(book_objs)==0):
+        return json({
+            "status": "Cannot find this book"
+        })
+    book = book_objs[0].to_dict()
 
-@users_bp.route('/', methods={'GET'})
-async def get_all_users(request):
-    async with request.app.ctx.redis as r:
-        users = await get_cache(r, CacheConstants.all_users)
-        if users is None:
-            users_objs = _db.get_books({})
-            users = [user.to_dict() for user in users_objs]
-            await set_cache(r, CacheConstants.all_users, users)
-    #book_objs = _db.get_books({})
-    #books = [book.to_dict() for book in book_objs]
-    number_of_users = len(users)
-    return json({
-        'n_users': number_of_users,
-        'books': users
-    })
+    if book['owner'] != username:
+        raise ApiBadRequest("You cannot have changes to this book")
+
+    changed = _db.put_book(_filter, changed_data)
+    if not changed:
+        raise ApiInternalError('Fail to change this book')
+
+    # TODO: Update cache
+
+    return json({'status': 'data changed successfully'})
+
