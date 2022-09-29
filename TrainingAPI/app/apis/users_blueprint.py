@@ -41,6 +41,7 @@ async def get_all_users(request):
 @validate_with_jsonschema(create_user_json_schema)  # To validate request body
 async def create_user(request):
     body = request.json
+    body['password'] = str(hashlib.md5(body["password"].encode()).hexdigest())
     check_username = _db.get_user(({"username": body['username']}))
 
     if check_username:
@@ -65,7 +66,7 @@ async def login_user(request):
     body = request.json
 
     user_name = body["username"]
-    user_password = body['password']
+    user_password = str(hashlib.md5(body["password"].encode()).hexdigest())
     account = _db.get_user({"username": user_name, "password": user_password})
     if not account:
         raise ApiBadRequest("Username or password incorrect")
@@ -74,9 +75,16 @@ async def login_user(request):
     change_jwt = _db.update_user_jwt({"username": user_name}, {"jwt": str(token_jwt)})
     if not change_jwt:
         raise ApiInternalError('Failed to login')
+    account = {
+        "username": user_name,
+        "password": user_password,
+        "jwt": str(token_jwt)
+    }
+    #print(account)
 
     return json({
         'status': "Login success",
+        "account": account
     })
 
 

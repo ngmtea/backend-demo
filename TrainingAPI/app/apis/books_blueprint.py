@@ -7,8 +7,8 @@ from app.constants.cache_constants import CacheConstants
 from app.databases.mongodb import MongoDB
 from app.databases.redis_cached import get_cache, set_cache
 from app.decorators.json_validator import validate_with_jsonschema
-from app.hooks.error import ApiInternalError, ApiBadRequest
-from app.models.book import create_book_json_schema, Book
+from app.hooks.error import ApiInternalError, ApiBadRequest, ApiForbidden
+from app.models.book import create_book_json_schema, Book, update_book_json_schema
 
 books_bp = Blueprint('books_blueprint', url_prefix='/books')
 
@@ -70,7 +70,7 @@ async def delete_book(request, book_id, username):
     book = book_objs[0].to_dict()
 
     if book['owner'] != username:
-        raise ApiBadRequest("You cannot have changes to this book")
+        raise ApiForbidden("You cannot have changes to this book")
 
     deleted = _db.delete_book(filter_)
     if not deleted:
@@ -97,6 +97,7 @@ async def get_book(request, book_id):
     })
 
 @books_bp.route('/<book_id>/', methods={'PUT'})
+@validate_with_jsonschema(update_book_json_schema)
 @protected
 async def put_book(request, book_id, username):
     changed_data = request.json
@@ -110,7 +111,7 @@ async def put_book(request, book_id, username):
     book = book_objs[0].to_dict()
 
     if book['owner'] != username:
-        raise ApiBadRequest("You cannot have changes to this book")
+        raise ApiForbidden("You cannot have changes to this book")
 
     changed = _db.put_book(_filter, changed_data)
     if not changed:
